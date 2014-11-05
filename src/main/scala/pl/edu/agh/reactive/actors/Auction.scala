@@ -4,7 +4,7 @@ import akka.actor.{Cancellable, ActorRef, FSM, Actor}
 import scala.concurrent.duration.Duration
 import java.util.concurrent.TimeUnit
 
-class Auction extends Actor with FSM[State, Data]{
+case class Auction(name: String) extends Actor with FSM[State, Data]{
   import context._
 
   val r = scala.util.Random
@@ -14,17 +14,17 @@ class Auction extends Actor with FSM[State, Data]{
   startWith(NonExisted, Uninitialized)
 
   when(NonExisted) {
-    case Event(Start(name, minPrice), Uninitialized) =>
+    case Event(Start(minPrice), Uninitialized) =>
       log.debug("Initialize auction.")
       scheduler.scheduleOnce(Duration.create(15, TimeUnit.SECONDS), self, BidTimerExpired())
-      goto(Created) using Item(name, minPrice, context.parent)
+      goto(Created) using Item(minPrice, context.parent)
   }
 
   when(Created) {
-    case Event(Bid(newOffer), Item(name, offer, winner)) =>
-      log.debug(s"New bid recieved ${sender().path.name} - $newOffer")
-      sender ! AuctionResponse("You are first.")
-      goto(Activated) using Item(name, newOffer, sender())
+    case Event(Bid(newOffer), Item( offer, winner)) =>
+      log.debug(s"New bid recieved ${sender().path.name} - price: $newOffer")
+      sender ! AuctionResponse(name, "You are first.")
+      goto(Activated) using Item( newOffer, sender())
 
     case Event(BidTimerExpired(), i: Item) =>
       log.debug("Auction Expired.")
@@ -42,19 +42,20 @@ class Auction extends Actor with FSM[State, Data]{
       stay()
   }
   when(Activated) {
-    case Event(Bid(newOffer), Item(name, offer, winner)) =>
+    case Event(Bid(newOffer), Item(offer, winner)) =>
       log.debug("Next bid recieved.")
-      if (newOffer >= offer) {
-        sender ! AuctionResponse("Your offer is too low.")
-        goto(Activated) using Item(name, offer, winner)
+      if (newOffer <= offer) {
+        sender ! AuctionResponse(name, s"Your offer is too low ($newOffer), current: $offer")
+        goto(Activated) using Item( offer, winner)
       }
       else {
-        sender ! AuctionResponse("Your offer is highest now.")
-        goto(Activated) using Item(name, newOffer, sender())
+        sender ! AuctionResponse(name, "Your offer is highest now.")
+        winner ! LostLeadNotification(newOffer)
+        goto(Activated) using Item(newOffer, sender())
       }
     case Event(BidTimerExpired(), i: Item) =>
       log.debug("Item sold.")
-      i.buyer ! AuctionResponse("You won auction")
+      i.buyer ! AuctionResponse(name, "You won auction")
       scheduler.scheduleOnce(Duration.create(5, TimeUnit.SECONDS), self, DeleteTimerExpired())
       goto(Sold) using i.copy()
   }
@@ -76,4 +77,4 @@ case object Sold extends State
 
 sealed trait Data
 case object Uninitialized extends Data
-case class Item(name: String, currentPrice: Int, buyer: ActorRef) extends Data
+case class Item(currentPrice: Int, buyer: ActorRef) extends Data
