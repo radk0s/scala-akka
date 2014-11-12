@@ -15,7 +15,7 @@ case class Buyer(max: Int) extends Actor{
 
   def receive = {
     case BidSomething() =>
-      val auctionSearch = context.actorSelection("akka://AuctionSystem/user/manager/auctionSearch")
+      val auctionSearch = context.actorSelection("akka://AuctionSystem/user/manager/masterSearch")
       auctionSearch ! SearchAuctions(phrases(r.nextInt(phrases.length)))
 
     case FoundAuctions(auctions) =>

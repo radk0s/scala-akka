@@ -25,7 +25,7 @@ class AuctionManager extends Actor{
         log.debug("Enable Auction Manager received")
         log.debug(context.parent.toString())
 
-        val search = context.actorOf(Props[AuctionSearch], "auctionSearch")
+        val search = context.actorOf(Props[MasterSearch], "masterSearch")
 
         val sellersList = (1 to NUM_OF_SELLERS).map(num => context.actorOf(Props[Seller], "seller"+num)).toList
 
