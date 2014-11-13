@@ -10,10 +10,11 @@ class AuctionSearch extends Actor {
 
   def receive = {
     case RegisterAuction(name, auction) =>
+//      log.info(s"registration: $name, $auction")
       auctions += (name -> auction)
 
     case SearchAuctions(phrase) =>
-
+//      log.info(s"search: $phrase")
       sender ! FoundAuctions(auctions.filterKeys(key => key.contains(phrase)).values)
 
   }
